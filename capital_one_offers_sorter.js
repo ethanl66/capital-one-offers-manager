@@ -1115,7 +1115,24 @@
       /* --- NEW: Offer history pill if increased since last saved --- */
       try {
         const key = [o.merchant, o.label, o.link].join('|');
-        const prev = prevMap.get(key);
+        let prev = prevMap.get(key);
+        // Fallback: labels/links often change. Match by merchant + type,
+        // and require channel only when both current and saved entries have it.
+        if (!prev) {
+          for (const p of prevMap.values()) {
+            if (!p) continue;
+            if (p.merchant !== o.merchant) continue;
+            if (p.type !== o.type) continue;
+            // If both have a non-empty channel, require it to match.
+            const savedHasChannel = p.channel && String(p.channel).trim().length > 0;
+            const curHasChannel = o.channel && String(o.channel).trim().length > 0;
+            if (savedHasChannel && curHasChannel && p.channel !== o.channel) continue;
+            // Accept this saved entry as the previous match.
+            prev = p;
+            break;
+          }
+        }
+
         if (prev && typeof prev.amount === 'number' && o.amount > prev.amount) {
           const delta = o.amount - prev.amount;
           line.dataset.increased = 'true';
@@ -1143,14 +1160,32 @@
             text = `+${delta}`;
           }
           pill.textContent = text;
+            // Add tooltip showing previous amount and saved date for context
+            try {
+              if (prev) {
+                let prevLabel = '';
+                if (prev.type === 'percent') prevLabel = `${prev.amount}%`;
+                else if (prev.type === 'multiplier') prevLabel = `${prev.amount}X`;
+                else if (prev.type === 'flat') {
+                  if (prev.label && prev.label.startsWith('$')) prevLabel = `$${prev.amount}`;
+                  else prevLabel = `${prev.amount} miles`;
+                } else {
+                  prevLabel = String(prev.amount);
+                }
+                const savedAtStr = prev.savedAt ? new Date(prev.savedAt).toLocaleString() : '';
+                pill.title = `Previous: ${prevLabel}${savedAtStr ? ' — ' + savedAtStr : ''}`;
+                pill.setAttribute('aria-label', pill.title);
+              }
+            } catch (err) {
+              /* ignore tooltip errors */
+            }
           /* put the pill next to the merchant text */
           content.appendChild(pill);
-        }
-        else {
+        } else {
           line.dataset.increased = 'false';
         }
       } catch (e) {
-        try { line.dataset.increased = 'false'; } catch(_){}
+        try { line.dataset.increased = 'false'; } catch(_){ }
         /* ignore errors building history pill */
       }
 
