@@ -74,6 +74,7 @@
         if (!o || !o.key) continue;
         m.set(o.key, o);
       }
+      console.log(`Loaded ${m.size} saved offers from ${OFFERS_STORAGE_KEY}`);
       return m;
     } catch (e) {
       console.error('Error reading saved offers:', e);
@@ -94,6 +95,7 @@
         savedAt: Date.now()
       }));
       localStorage.setItem(OFFERS_STORAGE_KEY, JSON.stringify(arr));
+      console.log(`Saved ${arr.length} offers to ${OFFERS_STORAGE_KEY}`);
     } catch (e) {
       console.error('Error saving offers:', e);
     }
@@ -545,6 +547,9 @@
     const BUTTON_TEXT = 'View More Offers';
     const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+    console.log('autoLoadAllOffers: started');
+    let clickCount = 0;
+
     statusEl.textContent = 'Auto-loading offers...';
     statusEl.style.backgroundColor = '#f4f4f4';
 
@@ -587,6 +592,8 @@
 
         // normal click
         try { targetButton.click(); } catch (e) { /* ignore */ }
+        clickCount++;
+        console.log(`autoLoadAllOffers: clicked '${BUTTON_TEXT}' (#${clickCount})`);
 
         // defensive: try to invoke framework handlers directly if available
         for (const key in targetButton) {
@@ -613,6 +620,7 @@
 
     statusEl.textContent = 'Auto-load complete. You can parse now.';
     statusEl.style.backgroundColor = '#c8e6c9';
+    console.log(`autoLoadAllOffers: complete after ${clickCount} clicks`);
   }
 
   /**
@@ -637,6 +645,7 @@
     /* Persist current results for next comparison */
     try {
       saveSavedOffers(allOffers);
+      console.log(`Persisted ${allOffers.length} offers to ${OFFERS_STORAGE_KEY}`);
     } catch (e) {
       console.error('Failed to persist offers:', e);
     }

@@ -28,7 +28,7 @@ javascript:(function(){
 })();
 ```
 3. Use the widget controls:
-   - Find & Scroll to 'View More' — locate the page's load-more button.
-   - Parse All Loaded Offers — collect and display parsed offers in the widget.
-   - Reset — clear parsed results and return the UI to compact mode.
+    - Find & Scroll to 'View More' — scrolls through the page and loads all offers until every offer has finished loading.
+    - Parse All Loaded Offers — collect and display parsed offers in the widget.
+    - Reset — clear parsed results and return the UI to compact mode.
 4. Use the search box and checkboxes to filter results; click a parsed row to scroll to the offer tile on the page.
