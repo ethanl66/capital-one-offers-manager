@@ -21,7 +21,7 @@ This repository contains bookmarklet-style scripts used to parse, inspect, and c
 ```javascript
 javascript:(function(){
   var s=document.createElement('script');
-  s.src='https://cdn.jsdelivr.net/gh/ethanl66/capital-one-offers-manager@main/capital_one_offers_sorter_mini.js';
+  s.src='https://cdn.jsdelivr.net/gh/ethanl66/capital-one-offers-manager@main/capital_one_offers_sorter.js';
   s.onload=function(){console.log('C1 script loaded')};
   s.onerror=function(e){console.error('failed to load script',e)};
   document.head.appendChild(s);
