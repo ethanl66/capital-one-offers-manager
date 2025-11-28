@@ -74,6 +74,7 @@
         if (!o || !o.key) continue;
         m.set(o.key, o);
       }
+      console.log(`Loaded ${m.size} saved offers from ${OFFERS_STORAGE_KEY}`);
       return m;
     } catch (e) {
       console.error('Error reading saved offers:', e);
@@ -94,6 +95,7 @@
         savedAt: Date.now()
       }));
       localStorage.setItem(OFFERS_STORAGE_KEY, JSON.stringify(arr));
+      console.log(`Saved ${arr.length} offers to ${OFFERS_STORAGE_KEY}`);
     } catch (e) {
       console.error('Error saving offers:', e);
     }
@@ -218,7 +220,22 @@
   scrollToButton.style.marginBottom = '8px';
   scrollToButton.onmouseover = () => scrollToButton.style.backgroundColor = '#005a9b';
   scrollToButton.onmouseout = () => scrollToButton.style.backgroundColor = '#0076c0';
-  scrollToButton.onclick = () => findAndScroll(statusEl);
+  scrollToButton.onclick = async () => {
+    // Automatically scroll and click the "View More Offers" control until none remain
+    try {
+      scrollToButton.disabled = true;
+      const origText = scrollToButton.textContent;
+      scrollToButton.textContent = 'Auto-loading...';
+      await autoLoadAllOffers(statusEl);
+      scrollToButton.textContent = origText;
+    } catch (err) {
+      console.error('Auto load failed:', err);
+      statusEl.textContent = `Auto-load error: ${err.message}`;
+      statusEl.style.backgroundColor = '#ffebee';
+    } finally {
+      scrollToButton.disabled = false;
+    }
+  };
 
   /* 2. Parse Button */
   const parseButton = document.createElement('button');
@@ -522,6 +539,91 @@
   }
 
   /**
+   * Auto-scroll to bottom and click "View More Offers" repeatedly until it's gone.
+   * This mirrors the behavior in `jaypatelversion` for automated loading.
+   * @param {HTMLElement} statusEl
+   */
+  async function autoLoadAllOffers(statusEl) {
+    const BUTTON_TEXT = 'View More Offers';
+    const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+    console.log('autoLoadAllOffers: started');
+    let clickCount = 0;
+
+    statusEl.textContent = 'Auto-loading offers...';
+    statusEl.style.backgroundColor = '#f4f4f4';
+
+    // helper to search for internal framework handlers (React/Vue)
+    function searchForHandler(obj) {
+      if (typeof obj === 'object' && obj !== null) {
+        for (const prop in obj) {
+          try {
+            if (typeof obj[prop] === 'function' && (prop.toLowerCase().includes('click') || prop.toLowerCase().includes('load'))) {
+              return obj[prop];
+            }
+            if (prop.includes('Props') || prop.includes('Children') || prop.includes('Memo')) {
+              const res = searchForHandler(obj[prop]);
+              if (res) return res;
+            }
+          } catch (e) {
+            // ignore access errors
+          }
+        }
+      }
+      return null;
+    }
+
+    // initial attempts to find the button (give the page some time to render)
+    let targetButton = null;
+    for (let i = 0; i < 10; i++) {
+      window.scrollTo(0, document.body.scrollHeight);
+      await sleep(250);
+      targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
+      if (targetButton) break;
+    }
+
+    // Loop while the button exists; click and wait for new content
+    while (targetButton) {
+      try {
+        window.scrollTo(0, document.body.scrollHeight);
+        statusEl.textContent = `Clicking '${BUTTON_TEXT}'...`;
+        targetButton.scrollIntoView({ block: 'center' });
+        await sleep(300);
+
+        // normal click
+        try { targetButton.click(); } catch (e) { /* ignore */ }
+        clickCount++;
+        console.log(`autoLoadAllOffers: clicked '${BUTTON_TEXT}' (#${clickCount})`);
+
+        // defensive: try to invoke framework handlers directly if available
+        for (const key in targetButton) {
+          if (key.startsWith('__react') || key.startsWith('__vue')) {
+            const internal = targetButton[key];
+            const handler = searchForHandler(internal);
+            if (typeof handler === 'function') {
+              try { handler({}); } catch (e) { /* ignore */ }
+            }
+            break;
+          }
+        }
+
+        // wait a bit for content to load
+        await sleep(600);
+
+        // re-scan for next button
+        targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
+      } catch (err) {
+        console.error('autoLoadAllOffers loop error:', err);
+        break;
+      }
+    }
+
+    statusEl.textContent = 'Auto-load complete. You can parse now.';
+    statusEl.style.backgroundColor = '#c8e6c9';
+    console.log(`autoLoadAllOffers: complete after ${clickCount} clicks`);
+  }
+
+  /**
    * Runs the parsing and display logic.
    * @param {HTMLElement} statusEl - The element to update with status messages.
    * @param {HTMLElement} resultsEl - The element to display the final results.
@@ -543,6 +645,7 @@
     /* Persist current results for next comparison */
     try {
       saveSavedOffers(allOffers);
+      console.log(`Persisted ${allOffers.length} offers to ${OFFERS_STORAGE_KEY}`);
     } catch (e) {
       console.error('Failed to persist offers:', e);
     }
