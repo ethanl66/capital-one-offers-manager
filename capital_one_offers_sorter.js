@@ -84,18 +84,45 @@
 
   function saveSavedOffers(offers) {
     try {
-      const arr = offers.map(o => ({
-        key: [o.merchant, o.label, o.link].join('|'),
-        type: o.type,
-        merchant: o.merchant,
-        amount: o.amount,
-        label: o.label,
-        link: o.link,
-        channel: o.channel || '',
-        savedAt: Date.now()
-      }));
+      // Merge incoming offers with existing saved offers instead of overwriting everything.
+      // Behavior:
+      // - If an incoming offer matches an existing one and any key fields changed, update savedAt to now.
+      // - If an existing saved offer is NOT present in the incoming list, keep it but set its amount to 0.
+      const existing = getSavedOffers(); // Map keyed by key
+      const seen = new Set();
+
+      for (const o of offers) {
+        const key = [o.merchant, o.label, o.link].join('|');
+        seen.add(key);
+        const prev = existing.get(key);
+
+        // Detect whether the incoming offer is meaningfully different from the saved one
+        const changed = !prev || prev.type !== o.type || prev.merchant !== o.merchant || prev.label !== o.label || prev.link !== o.link || Number(prev.amount) !== Number(o.amount) || ((prev.channel || '') !== (o.channel || ''));
+
+        const savedAt = (prev && !changed && prev.savedAt) ? prev.savedAt : Date.now();
+
+        existing.set(key, {
+          key,
+          type: o.type,
+          merchant: o.merchant,
+          amount: o.amount,
+          label: o.label,
+          link: o.link,
+          channel: o.channel || '',
+          savedAt
+        });
+      }
+
+      // Any previously-saved offers that were NOT present in the incoming list should have amount=0
+      for (const [k, v] of existing.entries()) {
+        if (!seen.has(k)) {
+          existing.set(k, Object.assign({}, v, { amount: 0 }));
+        }
+      }
+
+      const arr = [...existing.values()];
       localStorage.setItem(OFFERS_STORAGE_KEY, JSON.stringify(arr));
-      console.log(`Saved ${arr.length} offers to ${OFFERS_STORAGE_KEY}`);
+      console.log(`Merged and saved ${arr.length} offers to ${OFFERS_STORAGE_KEY}`);
     } catch (e) {
       console.error('Error saving offers:', e);
     }
