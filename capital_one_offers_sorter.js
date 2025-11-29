@@ -197,7 +197,7 @@
 
   /* Status Area */
   const statusEl = document.createElement('div');
-  statusEl.textContent = "Click 'Find & Scroll' to jump to the 'View More' button. Click it manually.";
+  statusEl.textContent = "Click 'Load All Offers' to automatically load every offer; then click 'Show Loaded Offers'.";
   statusEl.style.color = '#333';
   statusEl.style.backgroundColor = '#f4f4f4';
   statusEl.style.padding = '8px';
@@ -208,7 +208,7 @@
 
   /* 1. Scroll Button */
   const scrollToButton = document.createElement('button');
-  scrollToButton.textContent = "Find & Scroll to 'View More'";
+  scrollToButton.textContent = 'Load All Offers';
   scrollToButton.style.width = '100%';
   scrollToButton.style.padding = '10px';
   scrollToButton.style.backgroundColor = '#0076c0';
@@ -239,7 +239,7 @@
 
   /* 2. Parse Button */
   const parseButton = document.createElement('button');
-  parseButton.textContent = 'Parse All Loaded Offers';
+  parseButton.textContent = 'Show Loaded Offers';
   parseButton.style.width = '100%';
   parseButton.style.padding = '10px';
   parseButton.style.backgroundColor = '#25810e';
@@ -468,7 +468,7 @@
       scrollToButton.disabled = false;
       parseButton.style.backgroundColor = '#25810e';
       scrollToButton.style.backgroundColor = '#0076c0';
-      parseButton.textContent = 'Parse All Loaded Offers';
+      parseButton.textContent = 'View All Loaded Offers';
     }
   };
 
@@ -486,7 +486,7 @@
     parseButton.style.display = 'block';
     parseButton.disabled = false;
     scrollToButton.disabled = false;
-    parseButton.textContent = 'Parse All Loaded Offers';
+    parseButton.textContent = 'View All Loaded Offers';
     parseButton.style.backgroundColor = '#25810e';
     scrollToButton.style.backgroundColor = '#0076c0';
 
@@ -523,7 +523,7 @@
       statusEl.textContent = "Found it! Click the flashing red button.";
       statusEl.style.backgroundColor = '#fff9c4';
     } else {
-      statusEl.textContent = "All offers are loaded. You can parse now!";
+      statusEl.textContent = "All offers are loaded. You can view loaded offers now.";
       statusEl.style.backgroundColor = '#c8e6c9';
     }
   }
@@ -586,14 +586,15 @@
     while (targetButton) {
       try {
         window.scrollTo(0, document.body.scrollHeight);
-        statusEl.textContent = `Clicking '${BUTTON_TEXT}'...`;
+        //statusEl.textContent = `Clicking '${BUTTON_TEXT}'...`;
+        statusEl.textContent = 'Loading offers...';
         targetButton.scrollIntoView({ block: 'center' });
         await sleep(300);
 
         // normal click
         try { targetButton.click(); } catch (e) { /* ignore */ }
         clickCount++;
-        console.log(`autoLoadAllOffers: clicked '${BUTTON_TEXT}' (#${clickCount})`);
+        console.log(`autoLoadAllOffers: clicked '${BUTTON_TEXT}' (${clickCount})`);
 
         // defensive: try to invoke framework handlers directly if available
         for (const key in targetButton) {
@@ -618,7 +619,7 @@
       }
     }
 
-    statusEl.textContent = 'Auto-load complete. You can parse now.';
+    statusEl.textContent = 'Auto-load complete. You can view loaded offers now.';
     statusEl.style.backgroundColor = '#c8e6c9';
     console.log(`autoLoadAllOffers: complete after ${clickCount} clicks`);
   }
