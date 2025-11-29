@@ -9,7 +9,8 @@ This repository contains bookmarklet-style scripts used to parse, inspect, and c
 ## Features (dev)
 - Floating scraper widget injected into the page with a compact header and expandable body.
 - "Find & Scroll to 'View More'" button: finds and highlights the page's load-more control so you can expand the list of offers.
-- "Parse All Loaded Offers": parses visible offers into three categories — percent back, X miles multipliers, and flat offers (dollars or fixed miles).
+ - `Load All Offers` button: automatically scrolls and clicks the page's load-more control until all offers are loaded so you can parse everything at once.
+ - `Show Loaded Offers`: parses visible offers into three categories — percent back, X miles multipliers, and flat offers (dollars or fixed miles).
 - Comparison against previously saved offers to surface new or increased offers.
 - Filters: search by text, show starred merchants only, show increased offers only.
 - Starred merchants management (add/remove), saved to `localStorage`.
@@ -28,7 +29,7 @@ javascript:(function(){
 })();
 ```
 3. Use the widget controls:
-    - Find & Scroll to 'View More' — scrolls through the page and loads all offers until every offer has finished loading.
-    - Parse All Loaded Offers — collect and display parsed offers in the widget.
-    - Reset — clear parsed results and return the UI to compact mode.
+  - `Load All Offers` — automatically scrolls through the page and clicks the site's "View More Offers" controls until all offers are loaded.
+  - `Show Loaded Offers` — collect and display parsed offers in the widget.
+  - `Clear Results` — clear parsed results and return the UI to compact mode.
 4. Use the search box and checkboxes to filter results; click a parsed row to scroll to the offer tile on the page.
