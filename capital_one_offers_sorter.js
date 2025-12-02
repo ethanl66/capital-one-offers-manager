@@ -600,50 +600,75 @@
       return null;
     }
 
-    // initial attempts to find the button (give the page some time to render)
-    let targetButton = null;
-    for (let i = 0; i < 10; i++) {
-      window.scrollTo(0, document.body.scrollHeight);
-      await sleep(250);
-      targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
-      if (targetButton) break;
+    // Encapsulate the click loop so it can be invoked multiple times without duplicating code
+    async function doPass() {
+      // initial attempts to find the button (give the page some time to render)
+      let targetButton = null;
+      for (let i = 0; i < 10; i++) {
+        window.scrollTo(0, document.body.scrollHeight);
+        await sleep(250);
+        targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
+        if (targetButton) break;
+      }
+
+      // Loop while the button exists; click and wait for new content
+      while (targetButton) {
+        try {
+          window.scrollTo(0, document.body.scrollHeight);
+          statusEl.textContent = 'Loading offers...';
+          targetButton.scrollIntoView({ block: 'center' });
+          await sleep(300);
+
+          // normal click
+          try { targetButton.click(); } catch (e) { /* ignore */ }
+          clickCount++;
+          console.log(`autoLoadAllOffers: clicked '${BUTTON_TEXT}' (${clickCount})`);
+
+          // defensive: try to invoke framework handlers directly if available
+          for (const key in targetButton) {
+            if (key.startsWith('__react') || key.startsWith('__vue')) {
+              const internal = targetButton[key];
+              const handler = searchForHandler(internal);
+              if (typeof handler === 'function') {
+                try { handler({}); } catch (e) { /* ignore */ }
+              }
+              break;
+            }
+          }
+
+          // wait a bit for content to load
+          await sleep(600);
+
+          // re-scan for next button
+          targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
+        } catch (err) {
+          console.error('autoLoadAllOffers loop error:', err);
+          break;
+        }
+      }
     }
 
-    // Loop while the button exists; click and wait for new content
-    while (targetButton) {
+    // Run passes until two consecutive delayed rescans find nothing.
+    while (true) {
+      await doPass();
+
+      // perform up to two delayed rescans; if either finds a button, run another pass
+      let foundOnRescan = false;
       try {
-        window.scrollTo(0, document.body.scrollHeight);
-        //statusEl.textContent = `Clicking '${BUTTON_TEXT}'...`;
-        statusEl.textContent = 'Loading offers...';
-        targetButton.scrollIntoView({ block: 'center' });
-        await sleep(300);
-
-        // normal click
-        try { targetButton.click(); } catch (e) { /* ignore */ }
-        clickCount++;
-        console.log(`autoLoadAllOffers: clicked '${BUTTON_TEXT}' (${clickCount})`);
-
-        // defensive: try to invoke framework handlers directly if available
-        for (const key in targetButton) {
-          if (key.startsWith('__react') || key.startsWith('__vue')) {
-            const internal = targetButton[key];
-            const handler = searchForHandler(internal);
-            if (typeof handler === 'function') {
-              try { handler({}); } catch (e) { /* ignore */ }
-            }
+        for (let attempt = 1; attempt <= 2; attempt++) {
+          await sleep(800);
+          const maybe = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
+          if (maybe) {
+            console.log(`autoLoadAllOffers: rescan #${attempt} detected button; running another pass`);
+            foundOnRescan = true;
             break;
           }
         }
-
-        // wait a bit for content to load
-        await sleep(600);
-
-        // re-scan for next button
-        targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
-      } catch (err) {
-        console.error('autoLoadAllOffers loop error:', err);
-        break;
+      } catch (e) {
+        /* ignore rescans errors */
       }
+
+      if (!foundOnRescan) break;
     }
 
     statusEl.textContent = 'Auto-load complete. You can view loaded offers now.';
