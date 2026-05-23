@@ -560,7 +560,7 @@
    * @returns {HTMLElement | null} The button element or null.
    */
   function findViewMoreButton() {
-    const xpath = "//button[contains(., 'View More Offers')]";
+    const xpath = "//button[contains(., 'View More Offers') or contains(., 'Something went wrong, click to retry')]";
     const result = document.evaluate(xpath, document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null);
     return result.singleNodeValue;
   }
@@ -571,110 +571,164 @@
    * @param {HTMLElement} statusEl
    */
   async function autoLoadAllOffers(statusEl) {
-    const BUTTON_TEXT = 'View More Offers';
-    const sleep = ms => new Promise(r => setTimeout(r, ms));
+  const BUTTON_TEXTS = [
+    'View More Offers',
+    'Something went wrong, click to retry'
+  ];
 
-    console.log('autoLoadAllOffers: started');
-    let clickCount = 0;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-    statusEl.textContent = 'Auto-loading offers...';
-    statusEl.style.backgroundColor = '#f4f4f4';
+  console.log('autoLoadAllOffers: started');
+  let clickCount = 0;
 
-    // helper to search for internal framework handlers (React/Vue)
-    function searchForHandler(obj) {
-      if (typeof obj === 'object' && obj !== null) {
-        for (const prop in obj) {
-          try {
-            if (typeof obj[prop] === 'function' && (prop.toLowerCase().includes('click') || prop.toLowerCase().includes('load'))) {
-              return obj[prop];
-            }
-            if (prop.includes('Props') || prop.includes('Children') || prop.includes('Memo')) {
-              const res = searchForHandler(obj[prop]);
-              if (res) return res;
-            }
-          } catch (e) {
-            // ignore access errors
-          }
-        }
-      }
-      return null;
-    }
+  statusEl.textContent = 'Auto-loading offers...';
+  statusEl.style.backgroundColor = '#f4f4f4';
 
-    // Encapsulate the click loop so it can be invoked multiple times without duplicating code
-    async function doPass() {
-      // initial attempts to find the button (give the page some time to render)
-      let targetButton = null;
-      for (let i = 0; i < 10; i++) {
-        window.scrollTo(0, document.body.scrollHeight);
-        await sleep(250);
-        targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
-        if (targetButton) break;
-      }
+  function matchesTargetText(el) {
+    if (!el || !el.textContent) return false;
 
-      // Loop while the button exists; click and wait for new content
-      while (targetButton) {
+    const text = el.textContent.trim();
+
+    return BUTTON_TEXTS.some(buttonText =>
+      text === buttonText || text.includes(buttonText)
+    );
+  }
+
+  function findTargetButton() {
+    return Array.from(document.querySelectorAll('button, a')).find(matchesTargetText);
+  }
+
+  // helper to search for internal framework handlers (React/Vue)
+  function searchForHandler(obj) {
+    if (typeof obj === 'object' && obj !== null) {
+      for (const prop in obj) {
         try {
-          window.scrollTo(0, document.body.scrollHeight);
-          statusEl.textContent = 'Loading offers...';
-          targetButton.scrollIntoView({ block: 'center' });
-          await sleep(300);
-
-          // normal click
-          try { targetButton.click(); } catch (e) { /* ignore */ }
-          clickCount++;
-          console.log(`autoLoadAllOffers: clicked '${BUTTON_TEXT}' (${clickCount})`);
-
-          // defensive: try to invoke framework handlers directly if available
-          for (const key in targetButton) {
-            if (key.startsWith('__react') || key.startsWith('__vue')) {
-              const internal = targetButton[key];
-              const handler = searchForHandler(internal);
-              if (typeof handler === 'function') {
-                try { handler({}); } catch (e) { /* ignore */ }
-              }
-              break;
-            }
+          if (
+            typeof obj[prop] === 'function' &&
+            (prop.toLowerCase().includes('click') ||
+              prop.toLowerCase().includes('load'))
+          ) {
+            return obj[prop];
           }
 
-          // wait a bit for content to load
-          await sleep(600);
-
-          // re-scan for next button
-          targetButton = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
-        } catch (err) {
-          console.error('autoLoadAllOffers loop error:', err);
-          break;
+          if (
+            prop.includes('Props') ||
+            prop.includes('Children') ||
+            prop.includes('Memo')
+          ) {
+            const res = searchForHandler(obj[prop]);
+            if (res) return res;
+          }
+        } catch (e) {
+          // ignore access errors
         }
       }
     }
 
-    // Run passes until two consecutive delayed rescans find nothing.
-    while (true) {
-      await doPass();
+    return null;
+  }
 
-      // perform up to two delayed rescans; if either finds a button, run another pass
-      let foundOnRescan = false;
+  // Encapsulate the click loop so it can be invoked multiple times without duplicating code
+  async function doPass() {
+    // initial attempts to find the button (give the page some time to render)
+    let targetButton = null;
+
+    for (let i = 0; i < 10; i++) {
+      window.scrollTo(0, document.body.scrollHeight);
+      await sleep(250);
+
+      targetButton = findTargetButton();
+
+      if (targetButton) break;
+    }
+
+    // Loop while the button exists; click and wait for new content
+    while (targetButton) {
       try {
-        for (let attempt = 1; attempt <= 2; attempt++) {
-          await sleep(800);
-          const maybe = Array.from(document.querySelectorAll('button, a')).find(el => el.textContent && el.textContent.trim() === BUTTON_TEXT);
-          if (maybe) {
-            console.log(`autoLoadAllOffers: rescan #${attempt} detected button; running another pass`);
-            foundOnRescan = true;
+        window.scrollTo(0, document.body.scrollHeight);
+        statusEl.textContent = 'Loading offers...';
+
+        targetButton.scrollIntoView({ block: 'center' });
+        await sleep(300);
+
+        const clickedText = targetButton.textContent.trim();
+
+        // normal click
+        try {
+          targetButton.click();
+        } catch (e) {
+          // ignore
+        }
+
+        clickCount++;
+        console.log(
+          `autoLoadAllOffers: clicked '${clickedText}' (${clickCount})`
+        );
+
+        // defensive: try to invoke framework handlers directly if available
+        for (const key in targetButton) {
+          if (key.startsWith('__react') || key.startsWith('__vue')) {
+            const internal = targetButton[key];
+            const handler = searchForHandler(internal);
+
+            if (typeof handler === 'function') {
+              try {
+                handler({});
+              } catch (e) {
+                // ignore
+              }
+            }
+
             break;
           }
         }
-      } catch (e) {
-        /* ignore rescans errors */
-      }
 
-      if (!foundOnRescan) break;
+        // wait a bit for content to load
+        await sleep(600);
+
+        // re-scan for next button
+        targetButton = findTargetButton();
+      } catch (err) {
+        console.error('autoLoadAllOffers loop error:', err);
+        break;
+      }
+    }
+  }
+
+  // Run passes until two consecutive delayed rescans find nothing.
+  while (true) {
+    await doPass();
+
+    // perform up to two delayed rescans; if either finds a button, run another pass
+    let foundOnRescan = false;
+
+    try {
+      for (let attempt = 1; attempt <= 2; attempt++) {
+        await sleep(800);
+
+        const maybe = findTargetButton();
+
+        if (maybe) {
+          console.log(
+            `autoLoadAllOffers: rescan #${attempt} detected button; running another pass`
+          );
+
+          foundOnRescan = true;
+          break;
+        }
+      }
+    } catch (e) {
+      // ignore rescans errors
     }
 
-    statusEl.textContent = 'Auto-load complete. You can view loaded offers now.';
-    statusEl.style.backgroundColor = '#c8e6c9';
-    console.log(`autoLoadAllOffers: complete after ${clickCount} clicks`);
+    if (!foundOnRescan) break;
   }
+
+  statusEl.textContent = 'Auto-load complete. You can view loaded offers now.';
+  statusEl.style.backgroundColor = '#c8e6c9';
+
+  console.log(`autoLoadAllOffers: complete after ${clickCount} clicks`);
+}
 
   /**
    * Runs the parsing and display logic.
